@@ -34,19 +34,19 @@ requiredEnvVars.forEach(varName => {
 app.use(cors());
 app.use(express.json());
 
+// API Routes - must come before static file serving
+app.use('/api/auth', authRoutes);
+app.use('/api/news', newsRoutes);
+
 // Serve static files from client build if it exists
 const clientDistPath = path.join(__dirname, 'public');
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));
-  // Fallback for client-side routing
+  // Fallback for client-side routing - must come after API routes
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));
   });
 }
-
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/news', newsRoutes);
 
 // Database initialization with retry logic
 async function initDB() {
