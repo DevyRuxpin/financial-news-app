@@ -4,9 +4,8 @@ services:
     env: node
     plan: free
     buildCommand: |
-      npm install -g npm@latest
-      cd server && npm install --production --legacy-peer-deps
-      cd ../client && npm install --include=dev --legacy-peer-deps && npm run build
+      npm cache clean --force && cd server && npm install --production --legacy-peer-deps --force && cd ../client && npm install --include=dev --legacy-peer-deps && npm run build
+
     startCommand: npm --prefix server start
     envVars:
       - key: NODE_ENV
