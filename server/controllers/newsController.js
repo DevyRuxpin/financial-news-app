@@ -4,19 +4,42 @@ const { pool } = require('../models/db');
 const getNews = async (req, res) => {
   try {
     const { tickers, topics, time_from, sort, limit } = req.query;
-    const params = {
+    
+    // Default parameters for initial load
+    const defaultParams = {
       function: 'NEWS_SENTIMENT',
       apikey: process.env.ALPHA_VANTAGE_API_KEY,
-      ...(tickers && { tickers }),
-      ...(topics && { topics }),
-      ...(time_from && { time_from }),
-      ...(sort && { sort }),
-      ...(limit && { limit })
+      limit: '5',
+      sort: 'LATEST'
     };
+
+    // If no search parameters provided, use default parameters
+    const params = Object.keys(req.query).length === 0 
+      ? defaultParams 
+      : {
+          ...defaultParams,
+          ...(tickers && { tickers }),
+          ...(topics && { topics }),
+          ...(time_from && { time_from }),
+          ...(sort && { sort }),
+          ...(limit && { limit })
+        };
     
     const response = await axios.get('https://www.alphavantage.co/query', { params });
-    res.json(response.data);
+    
+    // Format the response data
+    const formattedData = {
+      feed: response.data.feed?.map(article => ({
+        ...article,
+        time_published: new Date(article.time_published).toISOString(),
+        overall_sentiment_label: article.overall_sentiment_label || 'Neutral'
+      })) || [],
+      items: response.data.items || 0
+    };
+    
+    res.json(formattedData);
   } catch (err) {
+    console.error('News fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch news' });
   }
 };
