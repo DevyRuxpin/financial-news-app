@@ -35,12 +35,12 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static files from client build if it exists
-const clientDistPath = path.join(__dirname, '../client/dist');
+const clientDistPath = path.join(__dirname, 'public');
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));
   // Fallback for client-side routing
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+    res.sendFile(path.join(__dirname, 'public/index.html'));
   });
 }
 
