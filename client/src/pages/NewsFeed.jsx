@@ -23,10 +23,21 @@ const NewsFeed = () => {
       console.log('Fetching news with params:', searchParams);
       const response = await axios.get('/api/news', { params: searchParams });
       console.log('News API response:', response.data);
-      setArticles(response.data.feed || []);
+      
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+      
+      if (!response.data.feed || response.data.feed.length === 0) {
+        setArticles([]);
+        setError('No articles found. Try adjusting your filters.');
+        return;
+      }
+      
+      setArticles(response.data.feed);
     } catch (err) {
       console.error('Error fetching news:', err.response || err);
-      setError('Failed to fetch news articles. Please try again later.');
+      setError(err.response?.data?.error || err.message || 'Failed to fetch news articles. Please try again later.');
     } finally {
       setLoading(false);
     }
