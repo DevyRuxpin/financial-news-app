@@ -2,10 +2,11 @@ services:
   - type: web
     name: financial-news-app
     env: node
+    plan: free
     buildCommand: |
-      cd client && npm install --include=dev && npm cache clean --force && npm run build
-
-    startCommand: node server.js
+      cd client && npm install --include=dev && npm run build
+      cd ../server && npm install
+    startCommand: node server/server.js
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -17,7 +18,6 @@ services:
         generateValue: true
       - key: NODE_ENV
         value: production
-
 databases:
   - name: financial-news-db
     plan: free
