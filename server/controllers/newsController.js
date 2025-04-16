@@ -49,4 +49,19 @@ const getSavedArticles = async (req, res) => {
   }
 };
 
-module.exports = { getNews, saveArticle, getSavedArticles };
+const deleteSavedArticle = async (req, res) => {
+  const { article_id } = req.params;
+  const user_id = req.user.userId;
+  
+  try {
+    await pool.query(
+      'DELETE FROM saved_articles WHERE user_id = $1 AND article_id = $2',
+      [user_id, article_id]
+    );
+    res.json({ message: 'Article removed' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove article' });
+  }
+};
+
+module.exports = { getNews, saveArticle, getSavedArticles, deleteSavedArticle };

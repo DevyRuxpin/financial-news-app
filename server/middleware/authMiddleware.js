@@ -1,8 +1,10 @@
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { pool } = require('../models/db');
 
+// Local strategy for email/password auth
 passport.use(new LocalStrategy(
   { usernameField: 'email' },
   async (email, password, done) => {
@@ -20,4 +22,18 @@ passport.use(new LocalStrategy(
   }
 ));
 
-module.exports = passport;
+// JWT strategy for token auth
+const jwtStrategy = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Forbidden' });
+    req.user = user;
+    next();
+  });
+};
+
+module.exports = { passport, jwtStrategy };
