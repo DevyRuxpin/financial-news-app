@@ -11,7 +11,8 @@ const getNews = async (req, res) => {
       function: 'NEWS_SENTIMENT',
       apikey: process.env.ALPHA_VANTAGE_API_KEY,
       limit: '5',
-      sort: 'LATEST'
+      sort: 'LATEST',
+      topics: 'financial_markets'  // Default topic for financial news
     };
 
     // If no search parameters provided, use default parameters
@@ -19,7 +20,7 @@ const getNews = async (req, res) => {
       ? defaultParams 
       : {
           ...defaultParams,
-          ...(tickers && { tickers }),
+          ...(tickers && { tickers: tickers.toUpperCase() }),  // Convert tickers to uppercase
           ...(topics && { topics }),
           ...(time_from && { time_from }),
           ...(sort && { sort }),
@@ -30,9 +31,17 @@ const getNews = async (req, res) => {
     const response = await axios.get('https://www.alphavantage.co/query', { params });
     console.log('Alpha Vantage API response:', response.data);
     
+    if (response.data.Note) {
+      throw new Error('API rate limit reached. Please try again later.');
+    }
+
+    if (!response.data.feed) {
+      throw new Error('No news feed data available');
+    }
+    
     // Format the response data
     const formattedData = {
-      feed: response.data.feed?.map(article => ({
+      feed: response.data.feed.map(article => ({
         ...article,
         time_published: new Date(article.time_published).toISOString(),
         overall_sentiment_label: article.overall_sentiment_label || 'Neutral',
@@ -41,7 +50,7 @@ const getNews = async (req, res) => {
         url: article.url || '#',
         authors: article.authors || [],
         ticker_sentiment: article.ticker_sentiment || []
-      })) || [],
+      })),
       items: response.data.items || 0
     };
     
