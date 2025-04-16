@@ -1,14 +1,20 @@
 // Load environment variables first with error handling
 try {
-  require('dotenv').config({ path: '../.env' }); // Look for .env in project root
+  require('dotenv').config(); // Try loading from current directory first
   console.log('Environment variables loaded');
 } catch (err) {
-  console.warn('Failed to load .env file. Using Render environment variables:', err.message);
+  try {
+    require('dotenv').config({ path: '../.env' }); // Fallback to project root
+    console.log('Environment variables loaded from project root');
+  } catch (err) {
+    console.warn('Failed to load .env file. Using Render environment variables:', err.message);
+  }
 }
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const authRoutes = require('./routes/authRoutes');
 const newsRoutes = require('./routes/newsRoutes');
 const { pool } = require('./models/db');
@@ -28,17 +34,19 @@ requiredEnvVars.forEach(varName => {
 app.use(cors());
 app.use(express.json());
 
-// Serve static files from client build
-app.use(express.static(path.join(__dirname, '../client/dist')));
+// Serve static files from client build if it exists
+const clientDistPath = path.join(__dirname, '../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  // Fallback for client-side routing
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  });
+}
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/news', newsRoutes);
-
-// Fallback for client-side routing
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-});
 
 // Database initialization with retry logic
 async function initDB() {

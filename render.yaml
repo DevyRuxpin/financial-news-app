@@ -1,12 +1,13 @@
 services:
   - type: web
     name: financial-news-app
-    env: node
+    runtime: node
     plan: free
-    buildCommand: npm cache clean --force && cd server && npm install --production --legacy-peer-deps --force && cd ../client && npm install --include=dev --legacy-peer-deps && npm run build
-
-      
-    startCommand: npm --prefix server start
+    buildCommand: |
+      npm install
+      cd server && npm install
+      cd ../client && npm install && npm run build
+    startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
         value: production
