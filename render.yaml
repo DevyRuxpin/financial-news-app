@@ -3,7 +3,7 @@ services:
     name: financial-news-app
     env: node
     buildCommand: |
-      cd client && npm install && npm run build
+      cd client && npm install --include=dev && npm run build
     startCommand: node server.js
     envVars:
       - key: DATABASE_URL
