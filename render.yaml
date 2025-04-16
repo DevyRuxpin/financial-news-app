@@ -3,11 +3,8 @@ services:
     name: financial-news-app
     runtime: node
     plan: free
-    buildCommand: |
-      npm install
-      cd server && npm install
-      cd ../client && npm install && npm run build
-    startCommand: cd server && npm start
+    buildCommand: npm run install:all && npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production

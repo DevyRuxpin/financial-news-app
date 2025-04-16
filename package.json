@@ -1,0 +1,14 @@
+{
+  "name": "financial-news-app",
+  "version": "1.0.0",
+  "description": "Financial News Application",
+  "scripts": {
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start"
+  },
+  "engines": {
+    "node": "18.x",
+    "npm": "10.x"
+  }
+} 
