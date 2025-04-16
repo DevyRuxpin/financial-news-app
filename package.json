@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Financial News Application",
   "scripts": {
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install --include=dev",
     "build": "cd client && npm run build",
     "start": "cd server && npm start"
   },
