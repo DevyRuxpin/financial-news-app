@@ -18,11 +18,13 @@ const News = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching news with params:', searchParams);
       const response = await axios.get('/api/news', { params: searchParams });
-      setArticles(response.data.feed);
+      console.log('News API response:', response.data);
+      setArticles(response.data.feed || []);
     } catch (err) {
+      console.error('Error fetching news:', err.response || err);
       setError('Failed to fetch news articles');
-      console.error('Error fetching news:', err);
     } finally {
       setLoading(false);
     }

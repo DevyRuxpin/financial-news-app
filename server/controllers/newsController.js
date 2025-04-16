@@ -4,6 +4,7 @@ const { pool } = require('../models/db');
 const getNews = async (req, res) => {
   try {
     const { tickers, topics, time_from, sort, limit } = req.query;
+    console.log('Received request with params:', { tickers, topics, time_from, sort, limit });
     
     // Default parameters for initial load
     const defaultParams = {
@@ -25,22 +26,33 @@ const getNews = async (req, res) => {
           ...(limit && { limit })
         };
     
+    console.log('Making API request with params:', params);
     const response = await axios.get('https://www.alphavantage.co/query', { params });
+    console.log('Alpha Vantage API response:', response.data);
     
     // Format the response data
     const formattedData = {
       feed: response.data.feed?.map(article => ({
         ...article,
         time_published: new Date(article.time_published).toISOString(),
-        overall_sentiment_label: article.overall_sentiment_label || 'Neutral'
+        overall_sentiment_label: article.overall_sentiment_label || 'Neutral',
+        title: article.title || 'No title available',
+        summary: article.summary || 'No summary available',
+        url: article.url || '#',
+        authors: article.authors || [],
+        ticker_sentiment: article.ticker_sentiment || []
       })) || [],
       items: response.data.items || 0
     };
     
+    console.log('Sending formatted response:', formattedData);
     res.json(formattedData);
   } catch (err) {
-    console.error('News fetch error:', err);
-    res.status(500).json({ error: 'Failed to fetch news' });
+    console.error('News fetch error:', err.response?.data || err.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch news',
+      details: err.response?.data || err.message
+    });
   }
 };
 
