@@ -34,36 +34,60 @@ const getNews = async (req, res) => {
         };
     
     console.log('Making API request with params:', { ...params, apikey: '[REDACTED]' });
-    const response = await axios.get('https://www.alphavantage.co/query', { params });
-    console.log('Alpha Vantage API response:', response.data);
     
-    if (response.data.Note) {
-      console.error('API rate limit note:', response.data.Note);
-      throw new Error('API rate limit reached. Please try again later.');
+    // Add timeout and retry logic
+    const maxRetries = 3;
+    let retryCount = 0;
+    let lastError = null;
+
+    while (retryCount < maxRetries) {
+      try {
+        const response = await axios.get('https://www.alphavantage.co/query', { 
+          params,
+          timeout: 10000 // 10 second timeout
+        });
+        
+        console.log('Alpha Vantage API response:', response.data);
+        
+        if (response.data.Note) {
+          console.error('API rate limit note:', response.data.Note);
+          throw new Error('API rate limit reached. Please try again later.');
+        }
+
+        if (!response.data.feed) {
+          console.error('No feed data in response:', response.data);
+          throw new Error('No news feed data available');
+        }
+        
+        // Format the response data
+        const formattedData = {
+          feed: response.data.feed.map(article => ({
+            ...article,
+            time_published: new Date(article.time_published).toISOString(),
+            overall_sentiment_label: article.overall_sentiment_label || 'Neutral',
+            title: article.title || 'No title available',
+            summary: article.summary || 'No summary available',
+            url: article.url || '#',
+            authors: article.authors || [],
+            ticker_sentiment: article.ticker_sentiment || []
+          })),
+          items: response.data.items || 0
+        };
+        
+        console.log('Sending formatted response with', formattedData.feed.length, 'articles');
+        return res.json(formattedData);
+      } catch (err) {
+        lastError = err;
+        retryCount++;
+        console.error(`Attempt ${retryCount} failed:`, err.message);
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        }
+      }
     }
 
-    if (!response.data.feed) {
-      console.error('No feed data in response:', response.data);
-      throw new Error('No news feed data available');
-    }
-    
-    // Format the response data
-    const formattedData = {
-      feed: response.data.feed.map(article => ({
-        ...article,
-        time_published: new Date(article.time_published).toISOString(),
-        overall_sentiment_label: article.overall_sentiment_label || 'Neutral',
-        title: article.title || 'No title available',
-        summary: article.summary || 'No summary available',
-        url: article.url || '#',
-        authors: article.authors || [],
-        ticker_sentiment: article.ticker_sentiment || []
-      })),
-      items: response.data.items || 0
-    };
-    
-    console.log('Sending formatted response with', formattedData.feed.length, 'articles');
-    res.json(formattedData);
+    // If we get here, all retries failed
+    throw lastError || new Error('Failed to fetch news after multiple attempts');
   } catch (err) {
     console.error('News fetch error:', {
       message: err.message,

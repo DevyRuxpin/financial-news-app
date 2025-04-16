@@ -21,7 +21,12 @@ const NewsFeed = () => {
       setLoading(true);
       setError(null);
       console.log('Fetching news with params:', searchParams);
-      const response = await axios.get('/api/news', { params: searchParams });
+      
+      const response = await axios.get('/api/news', { 
+        params: searchParams,
+        timeout: 15000 // 15 second timeout
+      });
+      
       console.log('News API response:', response.data);
       
       if (response.data.error) {
@@ -37,7 +42,9 @@ const NewsFeed = () => {
       setArticles(response.data.feed);
     } catch (err) {
       console.error('Error fetching news:', err.response || err);
-      setError(err.response?.data?.error || err.message || 'Failed to fetch news articles. Please try again later.');
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch news articles. Please try again later.';
+      setError(errorMessage);
+      setArticles([]);
     } finally {
       setLoading(false);
     }
@@ -78,9 +85,10 @@ const NewsFeed = () => {
       <div className="flex justify-end mb-4">
         <button
           onClick={handleSearch}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
+          disabled={loading}
         >
-          Search
+          {loading ? 'Loading...' : 'Search'}
         </button>
       </div>
 
@@ -93,9 +101,11 @@ const NewsFeed = () => {
           {error}
         </div>
       ) : articles.length === 0 ? (
-        <div className="text-center py-8">No articles found. Try adjusting your filters.</div>
+        <div className="text-center py-8 text-gray-600">
+          No articles found. Try adjusting your filters.
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {articles.map((article, index) => (
             <NewsCard
               key={index}
