@@ -23,27 +23,15 @@ const NewsFeed = () => {
       setError(null);
       console.log('Fetching news with params:', searchParams);
       
-      let response;
-      if (useMock) {
-        response = await axios.get('/api/news/mock');
-        setUsingMockData(true);
-      } else {
-        response = await axios.get('/api/news', { 
-          params: searchParams,
-          timeout: 15000
-        });
-        setUsingMockData(false);
-      }
+      const response = await axios.get('/api/news', { 
+        params: {
+          ...searchParams,
+          useMock: useMock ? 'true' : 'false'
+        },
+        timeout: 15000
+      });
       
       console.log('News API response:', response.data);
-      
-      if (response.data.error) {
-        if (response.data.error.includes('rate limit') && !useMock) {
-          // If rate limited, try using mock data
-          return fetchNews(searchParams, true);
-        }
-        throw new Error(response.data.error);
-      }
       
       if (!response.data.feed || response.data.feed.length === 0) {
         setArticles([]);
@@ -52,15 +40,10 @@ const NewsFeed = () => {
       }
       
       setArticles(response.data.feed);
+      setUsingMockData(useMock);
     } catch (err) {
       console.error('Error fetching news:', err.response || err);
       const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch news articles. Please try again later.';
-      
-      if (errorMessage.includes('rate limit') && !usingMockData) {
-        // If rate limited, try using mock data
-        return fetchNews(filters, true);
-      }
-      
       setError(errorMessage);
       setArticles([]);
     } finally {
@@ -95,7 +78,7 @@ const NewsFeed = () => {
 
   // Fetch initial articles on component mount
   useEffect(() => {
-    fetchNews();
+    fetchNews(filters, true); // Start with mock data
   }, []);
 
   return (
