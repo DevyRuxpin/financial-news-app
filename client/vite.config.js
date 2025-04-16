@@ -4,7 +4,18 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  root: path.resolve(__dirname, './'), // Explicit root
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src') // Add this alias
+    }
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html') // Explicit input
+      }
+    }
+  },
   server: {
     proxy: {
       '/api': {
