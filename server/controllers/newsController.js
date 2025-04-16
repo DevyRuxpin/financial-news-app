@@ -6,6 +6,12 @@ const getNews = async (req, res) => {
     const { tickers, topics, time_from, sort, limit } = req.query;
     console.log('Received request with params:', { tickers, topics, time_from, sort, limit });
     
+    // Check if API key is available
+    if (!process.env.ALPHA_VANTAGE_API_KEY) {
+      console.error('ALPHA_VANTAGE_API_KEY is not set');
+      throw new Error('API key is not configured');
+    }
+    
     // Default parameters for initial load
     const defaultParams = {
       function: 'NEWS_SENTIMENT',
@@ -27,15 +33,17 @@ const getNews = async (req, res) => {
           ...(limit && { limit })
         };
     
-    console.log('Making API request with params:', params);
+    console.log('Making API request with params:', { ...params, apikey: '[REDACTED]' });
     const response = await axios.get('https://www.alphavantage.co/query', { params });
     console.log('Alpha Vantage API response:', response.data);
     
     if (response.data.Note) {
+      console.error('API rate limit note:', response.data.Note);
       throw new Error('API rate limit reached. Please try again later.');
     }
 
     if (!response.data.feed) {
+      console.error('No feed data in response:', response.data);
       throw new Error('No news feed data available');
     }
     
@@ -54,10 +62,14 @@ const getNews = async (req, res) => {
       items: response.data.items || 0
     };
     
-    console.log('Sending formatted response:', formattedData);
+    console.log('Sending formatted response with', formattedData.feed.length, 'articles');
     res.json(formattedData);
   } catch (err) {
-    console.error('News fetch error:', err.response?.data || err.message);
+    console.error('News fetch error:', {
+      message: err.message,
+      response: err.response?.data,
+      stack: err.stack
+    });
     res.status(500).json({ 
       error: 'Failed to fetch news',
       details: err.response?.data || err.message
