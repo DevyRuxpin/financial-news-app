@@ -2,7 +2,9 @@ services:
   - type: web
     name: financial-news-app
     runtime: node
-    buildCommand: cd client && npm install && npm run build && cd ../server && npm install
+    buildCommand: |
+      cd client && npm install --production=false && npm run build -- --mode production
+      cd ../server && npm install --production=false
     startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
