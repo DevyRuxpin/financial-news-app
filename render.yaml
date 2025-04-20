@@ -1,24 +1,32 @@
-services:
-  - type: web
-    name: financial-news-app
-    runtime: node
-    buildCommand: cd client && npm install --include=dev && npm run build -- --mode production && cd ../server && npm install
-    startCommand: cd server && npm start
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 10000
-      - key: JWT_SECRET
-        sync: false
-      - key: NODE_VERSION
-        value: 18.17.0
-    plan: free
-
-databases:
-  - name: financial-news-db
-    databaseName: financial_news
-    user: financial_news_user
-    plan: free 
+{
+    "name": "financial-news-client",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "npx vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "@heroicons/react": "^2.1.1",
+        "axios": "^1.6.2",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-router-dom": "^6.18.0",
+        "react-toastify": "^11.0.5",
+        "vite": "^4.4.9",
+        "@vitejs/plugin-react": "^4.2.1",
+        "autoprefixer": "^10.4.16",
+        "postcss": "^8.4.31",
+        "tailwindcss": "^3.3.3"
+    },
+    "devDependencies": {
+        "@types/react": "^18.2.45",
+        "@types/react-dom": "^18.2.18"
+    },
+    "engines": {
+        "node": "18.x",
+        "npm": "10.x"
+    }
+}
