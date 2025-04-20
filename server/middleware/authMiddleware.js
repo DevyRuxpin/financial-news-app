@@ -3,6 +3,7 @@ const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../models/db');
+const UserModel = require('../models/userModel');
 
 // Local strategy for email/password auth
 passport.use(new LocalStrategy(
@@ -22,18 +23,41 @@ passport.use(new LocalStrategy(
   }
 ));
 
-// JWT strategy for token auth
-const jwtStrategy = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+const authenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Forbidden' });
-    req.user = user;
-    next();
-  });
+    const [bearer, token] = authHeader.split(' ');
+    if (bearer !== 'Bearer' || !token) {
+      return res.status(401).json({ message: 'Invalid token format' });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await UserModel.findById(decoded.userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: 'User not found' });
+      }
+
+      req.user = user;
+      next();
+    } catch (error) {
+      if (error instanceof jwt.JsonWebTokenError) {
+        return res.status(401).json({ message: 'Invalid token' });
+      }
+      if (error instanceof jwt.TokenExpiredError) {
+        return res.status(401).json({ message: 'Token expired' });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Authentication error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };
 
-module.exports = { passport, jwtStrategy };
+module.exports = { passport, authenticate };

@@ -1,68 +1,76 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { pool } = require('../models/db');
+const UserModel = require('../models/userModel');
 
 const register = async (req, res) => {
-  const { email, password } = req.body;
-  
   try {
+    const { email, password } = req.body;
+
     // Check if user already exists
-    const userExists = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (userExists.rows.length > 0) {
-      return res.status(400).json({ error: 'Email already in use' });
+    const existingUser = await UserModel.findByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING *',
-      [email, hashedPassword]
-    );
-    
-    // Generate JWT token
+
+    // Create user
+    const user = await UserModel.createUser(email, hashedPassword);
+
+    // Generate token
     const token = jwt.sign(
-      { userId: result.rows[0].id, email: result.rows[0].email },
+      { userId: user.id },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' }
     );
 
-    res.status(201).json({ 
-      user: result.rows[0],
-      token 
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: { id: user.id, email: user.email }
     });
-  } catch (err) {
-    res.status(500).json({ error: 'Registration failed' });
+  } catch (error) {
+    console.error('Error registering user:', error);
+    res.status(500).json({ message: 'Error registering user' });
   }
 };
 
 const login = async (req, res) => {
-  const { email, password } = req.body;
-  
   try {
-    const user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (user.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    const { email, password } = req.body;
+
+    // Find user
+    const user = await UserModel.findByEmail(email);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
-    
-    const isValid = await bcrypt.compare(password, user.rows[0].password_hash);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
-    
-    // Generate JWT token
+
+    // Generate token
     const token = jwt.sign(
-      { userId: user.rows[0].id, email: user.rows[0].email },
+      { userId: user.id },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' }
     );
 
-    res.json({ 
-      message: 'Logged in successfully',
-      user: user.rows[0],
-      token
+    res.status(200).json({
+      message: 'Login successful',
+      token,
+      user: { id: user.id, email: user.email }
     });
-  } catch (err) {
-    res.status(500).json({ error: 'Login failed' });
+  } catch (error) {
+    console.error('Error logging in:', error);
+    res.status(500).json({ message: 'Error logging in' });
   }
 };
 
-module.exports = { register, login };
+module.exports = {
+  register,
+  login
+};

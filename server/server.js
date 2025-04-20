@@ -31,21 +31,30 @@ requiredEnvVars.forEach(varName => {
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://financial-news-app-347q.onrender.com', 'https://jobly-backend-zp0b.onrender.com']
+    : '*',
+  credentials: true
+}));
 app.use(express.json());
 
 // API Routes - must come before static file serving
 app.use('/api/auth', authRoutes);
 app.use('/api/news', newsRoutes);
 
-// Serve static files from client build if it exists
+// Serve static files from client build
 const clientDistPath = path.join(__dirname, 'public');
 if (fs.existsSync(clientDistPath)) {
+  console.log('Serving static files from:', clientDistPath);
   app.use(express.static(clientDistPath));
-  // Fallback for client-side routing - must come after API routes
+  
+  // Fallback for client-side routing
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public/index.html'));
+    res.sendFile(path.join(clientDistPath, 'index.html'));
   });
+} else {
+  console.warn('Client build directory not found:', clientDistPath);
 }
 
 // Database initialization with retry logic

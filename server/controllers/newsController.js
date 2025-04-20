@@ -1,7 +1,16 @@
 const axios = require('axios');
 const { pool } = require('../models/db');
 
-// Mock data for testing
+// Cache implementation
+const cache = {
+  data: null,
+  timestamp: null,
+  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+  isRateLimited: false,
+  rateLimitResetTime: null
+};
+
+// Enhanced mock data with more variety
 const mockData = {
   feed: [
     {
@@ -39,19 +48,71 @@ const mockData = {
         { ticker: "XOM", ticker_sentiment_label: "Bearish" },
         { ticker: "CVX", ticker_sentiment_label: "Somewhat-Bearish" }
       ]
+    },
+    {
+      title: "Cryptocurrency Market Shows Signs of Recovery",
+      summary: "Bitcoin and Ethereum show strong recovery after recent market correction.",
+      time_published: "20240416T130000",
+      authors: ["Michael Chen"],
+      url: "https://example.com/article4",
+      overall_sentiment_label: "Somewhat-Bullish",
+      ticker_sentiment: [
+        { ticker: "BTC", ticker_sentiment_label: "Bullish" },
+        { ticker: "ETH", ticker_sentiment_label: "Somewhat-Bullish" }
+      ]
+    },
+    {
+      title: "Retail Sector Faces Headwinds",
+      summary: "Major retailers report declining sales amid changing consumer behavior.",
+      time_published: "20240416T120000",
+      authors: ["Emily Brown"],
+      url: "https://example.com/article5",
+      overall_sentiment_label: "Somewhat-Bearish",
+      ticker_sentiment: [
+        { ticker: "WMT", ticker_sentiment_label: "Neutral" },
+        { ticker: "TGT", ticker_sentiment_label: "Bearish" }
+      ]
     }
   ],
-  items: 3
+  items: 5
 };
+
+// Helper function to check if cache is valid
+const isCacheValid = () => {
+  if (!cache.data || !cache.timestamp) return false;
+  if (cache.isRateLimited && cache.rateLimitResetTime > Date.now()) return true;
+  return Date.now() - cache.timestamp < cache.CACHE_DURATION;
+};
+
+// Helper function to format API response
+const formatNewsData = (data) => ({
+  feed: data.feed.map(article => ({
+    ...article,
+    time_published: new Date(article.time_published).toISOString(),
+    overall_sentiment_label: article.overall_sentiment_label || 'Neutral',
+    title: article.title || 'No title available',
+    summary: article.summary || 'No summary available',
+    url: article.url || '#',
+    authors: article.authors || [],
+    ticker_sentiment: article.ticker_sentiment || []
+  })),
+  items: data.items || 0
+});
 
 const getNews = async (req, res) => {
   try {
-    const { useMock } = req.query;
+    const { useMock, forceRefresh } = req.query;
     
     // If useMock is true, return mock data immediately
     if (useMock === 'true') {
-      console.log('Using mock data');
+      console.log('Using mock data as requested');
       return res.json(mockData);
+    }
+
+    // Check cache first if not forcing refresh
+    if (!forceRefresh && isCacheValid()) {
+      console.log('Returning cached data');
+      return res.json(cache.data);
     }
 
     const { tickers, topics, time_from, sort, limit } = req.query;
@@ -60,7 +121,7 @@ const getNews = async (req, res) => {
     // Check if API key is available
     if (!process.env.ALPHA_VANTAGE_API_KEY) {
       console.error('ALPHA_VANTAGE_API_KEY is not set');
-      return res.json(mockData); // Return mock data if API key is not set
+      return res.json(mockData);
     }
     
     // Default parameters for initial load
@@ -69,15 +130,15 @@ const getNews = async (req, res) => {
       apikey: process.env.ALPHA_VANTAGE_API_KEY,
       limit: '5',
       sort: 'LATEST',
-      topics: 'financial_markets'  // Default topic for financial news
+      topics: 'financial_markets'
     };
 
-    // If no search parameters provided, use default parameters
+    // Build query parameters
     const params = Object.keys(req.query).length === 0 
       ? defaultParams 
       : {
           ...defaultParams,
-          ...(tickers && { tickers: tickers.toUpperCase() }),  // Convert tickers to uppercase
+          ...(tickers && { tickers: tickers.toUpperCase() }),
           ...(topics && { topics }),
           ...(time_from && { time_from }),
           ...(sort && { sort }),
@@ -86,53 +147,58 @@ const getNews = async (req, res) => {
     
     console.log('Making API request with params:', { ...params, apikey: '[REDACTED]' });
     
-    // Add timeout and retry logic
+    // Enhanced retry logic
     const maxRetries = 3;
     let retryCount = 0;
     let lastError = null;
+    let retryDelay = 2000; // Start with 2 seconds
 
     while (retryCount < maxRetries) {
       try {
         const response = await axios.get('https://www.alphavantage.co/query', { 
           params,
-          timeout: 10000 // 10 second timeout
+          timeout: 15000 // Increased timeout to 15 seconds
         });
         
         console.log('Alpha Vantage API response:', response.data);
         
         if (response.data.Note) {
           console.error('API rate limit note:', response.data.Note);
-          return res.json(mockData); // Return mock data on rate limit
+          // Set rate limit cache
+          cache.isRateLimited = true;
+          cache.rateLimitResetTime = Date.now() + 60 * 1000; // Assume 1 minute cooldown
+          return res.json(mockData);
         }
 
         if (!response.data.feed) {
           console.error('No feed data in response:', response.data);
-          return res.json(mockData); // Return mock data if no feed data
+          return res.json(mockData);
         }
         
-        // Format the response data
-        const formattedData = {
-          feed: response.data.feed.map(article => ({
-            ...article,
-            time_published: new Date(article.time_published).toISOString(),
-            overall_sentiment_label: article.overall_sentiment_label || 'Neutral',
-            title: article.title || 'No title available',
-            summary: article.summary || 'No summary available',
-            url: article.url || '#',
-            authors: article.authors || [],
-            ticker_sentiment: article.ticker_sentiment || []
-          })),
-          items: response.data.items || 0
-        };
+        // Format and cache the response
+        const formattedData = formatNewsData(response.data);
+        cache.data = formattedData;
+        cache.timestamp = Date.now();
+        cache.isRateLimited = false;
         
         console.log('Sending formatted response with', formattedData.feed.length, 'articles');
         return res.json(formattedData);
       } catch (err) {
         lastError = err;
         retryCount++;
-        console.error(`Attempt ${retryCount} failed:`, err.message);
+        
+        // Exponential backoff
+        retryDelay *= 2;
+        
+        console.error(`Attempt ${retryCount} failed:`, {
+          message: err.message,
+          code: err.code,
+          response: err.response?.data
+        });
+        
         if (retryCount < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+          console.log(`Retrying in ${retryDelay/1000} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
       }
     }
@@ -146,7 +212,6 @@ const getNews = async (req, res) => {
       response: err.response?.data,
       stack: err.stack
     });
-    // On any error, return mock data
     return res.json(mockData);
   }
 };
