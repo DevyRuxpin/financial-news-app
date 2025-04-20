@@ -1,5 +1,6 @@
 const axios = require('axios');
-const { pool } = require('../models/db');
+const databaseService = require('../services/databaseService');
+const logger = require('../utils/logger');
 
 // Cache implementation
 const cache = {
@@ -217,46 +218,56 @@ const getNews = async (req, res) => {
 };
 
 const saveArticle = async (req, res) => {
-  const { user_id, article_id } = req.body;
-  
   try {
-    await pool.query(
-      'INSERT INTO saved_articles (user_id, article_id) VALUES ($1, $2)',
+    const { article_id } = req.body;
+    const user_id = req.user.id;
+
+    await databaseService.query(
+      'INSERT INTO saved_articles (user_id, article_id) VALUES ($1, $2) ON CONFLICT (user_id, article_id) DO NOTHING',
       [user_id, article_id]
     );
-    res.json({ message: 'Article saved' });
-  } catch (err) {
-    res.status(400).json({ error: 'Failed to save article' });
+
+    res.json({ message: 'Article saved successfully' });
+  } catch (error) {
+    logger.error('Error saving article:', error);
+    res.status(500).json({ error: 'Failed to save article' });
   }
 };
 
 const getSavedArticles = async (req, res) => {
-  const { user_id } = req.params;
-  
   try {
-    const result = await pool.query(
-      'SELECT * FROM saved_articles WHERE user_id = $1',
+    const user_id = req.user.id;
+    const result = await databaseService.query(
+      'SELECT article_id FROM saved_articles WHERE user_id = $1',
       [user_id]
     );
     res.json(result.rows);
-  } catch (err) {
+  } catch (error) {
+    logger.error('Error fetching saved articles:', error);
     res.status(500).json({ error: 'Failed to fetch saved articles' });
   }
 };
 
 const deleteSavedArticle = async (req, res) => {
-  const { article_id } = req.params;
-  const user_id = req.user.userId;
-  
   try {
-    await pool.query(
+    const { article_id } = req.params;
+    const user_id = req.user.id;
+
+    await databaseService.query(
       'DELETE FROM saved_articles WHERE user_id = $1 AND article_id = $2',
       [user_id, article_id]
     );
-    res.json({ message: 'Article removed' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to remove article' });
+
+    res.json({ message: 'Article deleted successfully' });
+  } catch (error) {
+    logger.error('Error deleting article:', error);
+    res.status(500).json({ error: 'Failed to delete article' });
   }
 };
 
-module.exports = { getNews, saveArticle, getSavedArticles, deleteSavedArticle };
+module.exports = {
+  getNews,
+  saveArticle,
+  getSavedArticles,
+  deleteSavedArticle
+};

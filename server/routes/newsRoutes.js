@@ -1,6 +1,6 @@
 const express = require('express');
 const { getNews, saveArticle, getSavedArticles, deleteSavedArticle } = require('../controllers/newsController');
-const { jwtStrategy } = require('../middleware/authMiddleware');
+const { authMiddleware } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -52,8 +52,8 @@ router.get('/mock', (req, res) => {
 });
 
 // Protected routes
-router.post('/save', jwtStrategy, saveArticle);
-router.get('/saved/:user_id', jwtStrategy, getSavedArticles);
-router.delete('/saved/:article_id', jwtStrategy, deleteSavedArticle);
+router.post('/save', authMiddleware, saveArticle);
+router.get('/saved', authMiddleware, getSavedArticles);
+router.delete('/saved/:article_id', authMiddleware, deleteSavedArticle);
 
 module.exports = router;

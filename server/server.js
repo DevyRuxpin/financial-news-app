@@ -15,9 +15,15 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const morgan = require('morgan');
 const authRoutes = require('./routes/authRoutes');
 const newsRoutes = require('./routes/newsRoutes');
-const { pool } = require('./models/db');
+const { authMiddleware } = require('./middleware/authMiddleware');
+const errorHandler = require('./middleware/errorHandler');
+const logger = require('./utils/logger');
+const databaseService = require('./services/databaseService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,27 +32,40 @@ const PORT = process.env.PORT || 3001;
 const requiredEnvVars = ['DATABASE_URL', 'ALPHA_VANTAGE_API_KEY', 'JWT_SECRET'];
 requiredEnvVars.forEach(varName => {
   if (!process.env[varName]) {
-    console.error(`Missing required environment variable: ${varName}`);
+    logger.error(`Missing required environment variable: ${varName}`);
   }
 });
 
-// Middleware
+// Security middleware
+app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://financial-news-app-347q.onrender.com', 'https://jobly-backend-zp0b.onrender.com']
     : '*',
   credentials: true
 }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use('/api/', limiter);
+
+// Logging
+app.use(morgan('combined', { stream: logger.stream }));
+
+// Body parsing
 app.use(express.json());
 
-// API Routes - must come before static file serving
+// API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/news', newsRoutes);
+app.use('/api/news', authMiddleware, newsRoutes);
 
 // Serve static files from client build
 const clientDistPath = path.join(__dirname, 'public');
 if (fs.existsSync(clientDistPath)) {
-  console.log('Serving static files from:', clientDistPath);
+  logger.info('Serving static files from:', clientDistPath);
   app.use(express.static(clientDistPath));
   
   // Fallback for client-side routing
@@ -54,8 +73,11 @@ if (fs.existsSync(clientDistPath)) {
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 } else {
-  console.warn('Client build directory not found:', clientDistPath);
+  logger.warn('Client build directory not found:', clientDistPath);
 }
+
+// Error handling middleware
+app.use(errorHandler);
 
 // Database initialization with retry logic
 async function initDB() {
@@ -64,11 +86,11 @@ async function initDB() {
   
   while (retryCount < maxRetries) {
     try {
-      await pool.query(`
+      await databaseService.query(`
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
           email VARCHAR(255) UNIQUE NOT NULL,
-          password_hash VARCHAR(255) NOT NULL,
+          password VARCHAR(255) NOT NULL,
           created_at TIMESTAMP DEFAULT NOW()
         );
         
@@ -80,11 +102,11 @@ async function initDB() {
           UNIQUE(user_id, article_id)
         );
       `);
-      console.log('Database initialized successfully');
+      logger.info('Database initialized successfully');
       return;
     } catch (err) {
       retryCount++;
-      console.error(`Database initialization attempt ${retryCount} failed:`, err);
+      logger.error(`Database initialization attempt ${retryCount} failed:`, err);
       if (retryCount < maxRetries) {
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
@@ -93,20 +115,27 @@ async function initDB() {
   throw new Error('Database initialization failed after multiple attempts');
 }
 
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received. Shutting down gracefully...');
+  await databaseService.close();
+  process.exit(0);
+});
+
 // Start server with error handling
 async function startServer() {
   try {
     await initDB();
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log('Current environment variables:', {
+      logger.info(`Server running on port ${PORT}`);
+      logger.info('Current environment variables:', {
         NODE_ENV: process.env.NODE_ENV,
-        DB_CONNECTED: !!pool,
+        DB_CONNECTED: true,
         API_KEY_SET: !!process.env.ALPHA_VANTAGE_API_KEY
       });
     });
   } catch (err) {
-    console.error('Failed to start server:', err);
+    logger.error('Failed to start server:', err);
     process.exit(1);
   }
 }

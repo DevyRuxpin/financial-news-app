@@ -16,7 +16,7 @@ const validateRegister = [
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')
-    .matches(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/)
+    .matches(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/)
     .withMessage('Password must contain at least one letter and one number'),
   handleValidationErrors
 ];
@@ -29,6 +29,19 @@ const validateLogin = [
   body('password')
     .notEmpty()
     .withMessage('Password is required'),
+  handleValidationErrors
+];
+
+const validatePasswordReset = [
+  body('email')
+    .isEmail()
+    .withMessage('Please enter a valid email')
+    .normalizeEmail(),
+  body('newPassword')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/)
+    .withMessage('Password must contain at least one letter and one number'),
   handleValidationErrors
 ];
 
@@ -51,5 +64,6 @@ const validateArticle = [
 module.exports = {
   validateRegister,
   validateLogin,
+  validatePasswordReset,
   validateArticle
 }; 

@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../models/db');
 const UserModel = require('../models/userModel');
+const { AuthenticationError } = require('../utils/errors');
+const logger = require('../utils/logger');
 
 // Local strategy for email/password auth
 passport.use(new LocalStrategy(
@@ -23,41 +25,39 @@ passport.use(new LocalStrategy(
   }
 ));
 
-const authenticate = async (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ message: 'No token provided' });
+    // Get token from header
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      throw new AuthenticationError('No authentication token provided');
     }
 
-    const [bearer, token] = authHeader.split(' ');
-    if (bearer !== 'Bearer' || !token) {
-      return res.status(401).json({ message: 'Invalid token format' });
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Find user
+    const user = await UserModel.findById(decoded.userId);
+    if (!user) {
+      throw new AuthenticationError('User not found');
     }
 
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await UserModel.findById(decoded.userId);
-      
-      if (!user) {
-        return res.status(401).json({ message: 'User not found' });
-      }
-
-      req.user = user;
-      next();
-    } catch (error) {
-      if (error instanceof jwt.JsonWebTokenError) {
-        return res.status(401).json({ message: 'Invalid token' });
-      }
-      if (error instanceof jwt.TokenExpiredError) {
-        return res.status(401).json({ message: 'Token expired' });
-      }
-      throw error;
-    }
+    // Add user to request object
+    req.user = user;
+    req.token = token;
+    
+    next();
   } catch (error) {
-    console.error('Authentication error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    logger.error('Authentication error', { error });
+    if (error.name === 'JsonWebTokenError') {
+      next(new AuthenticationError('Invalid token'));
+    } else if (error.name === 'TokenExpiredError') {
+      next(new AuthenticationError('Token expired'));
+    } else {
+      next(error);
+    }
   }
 };
 
-module.exports = { passport, authenticate };
+module.exports = { passport, authMiddleware };

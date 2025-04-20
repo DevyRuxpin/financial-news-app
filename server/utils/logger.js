@@ -19,28 +19,20 @@ const logger = winston.createLogger({
     winston.format.json()
   ),
   transports: [
-    new winston.transports.DailyRotateFile({
-      filename: logFile,
-      datePattern: 'YYYY-MM-DD',
-      maxSize: '20m',
-      maxFiles: '14d',
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-      )
-    }),
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.simple()
       )
-    })
+    }),
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' })
   ]
 });
 
-// Create a stream object for Morgan
+// Create a stream object with a 'write' function that will be used by `morgan`
 logger.stream = {
-  write: (message) => {
+  write: function(message) {
     logger.info(message.trim());
   }
 };
