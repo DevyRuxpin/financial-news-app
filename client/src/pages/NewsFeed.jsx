@@ -82,9 +82,9 @@ const NewsFeed = () => {
   }, []);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Financial News</h1>
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">Financial News</h1>
         <button
           onClick={toggleMockData}
           className={`px-4 py-2 rounded transition-colors ${
@@ -98,21 +98,23 @@ const NewsFeed = () => {
       </div>
       
       {usingMockData && (
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-6">
           <p>Note: Using mock data due to API rate limits. Real-time data will be available when the rate limit resets.</p>
         </div>
       )}
       
-      <NewsFilter filters={filters} setFilters={setFilters} />
-      
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={handleSearch}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
-          disabled={loading}
-        >
-          {loading ? 'Loading...' : 'Search'}
-        </button>
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <NewsFilter filters={filters} setFilters={setFilters} />
+        
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={handleSearch}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+            disabled={loading}
+          >
+            {loading ? 'Loading...' : 'Search'}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -124,11 +126,11 @@ const NewsFeed = () => {
           {error}
         </div>
       ) : articles.length === 0 ? (
-        <div className="text-center py-8 text-gray-600">
+        <div className="text-center py-12 text-gray-600 bg-white rounded-xl shadow-sm">
           No articles found. Try adjusting your filters.
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="grid gap-6">
           {articles.map((article, index) => (
             <NewsCard
               key={index}
