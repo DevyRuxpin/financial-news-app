@@ -47,7 +47,7 @@ The application uses Alpha Vantage's API for financial news data. For testing pu
 
 1. Clone the repository:
 ```bash
-git clone https://github.com//DevyRuxpin/financial-news-app.git
+git clone https://github.com/DevyRuxpin/financial-news-app.git
 cd financial-news-app
 ```
 
@@ -186,3 +186,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Alpha Vantage for financial data
 - React and Express.js communities
 - All contributors and supporters
+
+

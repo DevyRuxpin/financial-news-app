@@ -1,14 +1,43 @@
 {
-  "name": "financial-news-app",
+  "name": "news-app",
   "version": "1.0.0",
-  "description": "Financial News Application",
+  "description": "News application with authentication and article saving",
+  "main": "server/index.js",
   "scripts": {
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install --include=dev",
-    "build": "cd client && npm run build",
-    "start": "cd server && npm start"
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "test": "jest --setupFiles ./server/tests/setup.js",
+    "test:watch": "jest --watch --setupFiles ./server/tests/setup.js",
+    "test:setup": "node scripts/setup-test-db.js",
+    "test:schema": "node scripts/setup-test-schema.js",
+    "test:all": "npm run test:setup && npm run test:schema && npm test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
-  "engines": {
-    "node": "18.x",
-    "npm": "10.x"
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.0",
+    "passport": "^0.7.0",
+    "passport-local": "^1.0.0",
+    "pg": "^8.10.0",
+    "winston": "^3.8.2",
+    "winston-daily-rotate-file": "^4.7.1",
+    "express-rate-limit": "^6.7.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.40.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-jsx-a11y": "^6.7.1",
+    "eslint-plugin-react": "^7.32.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "jest": "^29.7.0",
+    "nodemon": "^2.0.22",
+    "supertest": "^6.3.4"
   }
-} 
+}
