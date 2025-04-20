@@ -3,7 +3,7 @@ services:
     name: financial-news-app
     runtime: node
     buildCommand: |
-      cd client && npm install && npm run build -- --mode production
+      cd client && npm install --force && npm install tailwindcss@latest postcss@latest autoprefixer@latest && npm run build -- --mode production
       cd ../server && npm install
     startCommand: cd server && npm start
     envVars:
