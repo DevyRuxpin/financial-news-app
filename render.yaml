@@ -3,8 +3,8 @@ services:
     name: financial-news-app
     runtime: node
     buildCommand: |
-      cd client && npm install --production=false && npm run build -- --mode production
-      cd ../server && npm install --production=false
+      cd client && npm install && npm install -g vite && npm run build
+      cd ../server && npm install
     startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
