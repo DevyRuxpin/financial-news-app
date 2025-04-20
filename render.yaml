@@ -2,21 +2,19 @@ services:
   - type: web
     name: financial-news-app
     runtime: node
-    buildCommand: |
-      cd client && npm install && npm install -g vite && npm run build
-      cd ../server && npm install
+    buildCommand: cd client && npm install --include=dev && npm run build -- --mode production && cd ../server && npm install
     startCommand: cd server && npm start
     envVars:
+      - key: DATABASE_URL
+        sync: false
       - key: NODE_ENV
         value: production
-      - key: ALPHA_VANTAGE_API_KEY
-        sync: false
+      - key: PORT
+        value: 10000
       - key: JWT_SECRET
         sync: false
-      - key: DATABASE_URL
-        fromDatabase:
-          name: financial-news-db
-          property: connectionString
+      - key: NODE_VERSION
+        value: 18.17.0
     plan: free
 
 databases:
