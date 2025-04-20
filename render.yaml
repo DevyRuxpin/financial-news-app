@@ -17,6 +17,8 @@ services:
         sync: false
       - key: NODE_VERSION
         value: 18.17.0
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
     plan: free
 
 databases:
