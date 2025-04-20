@@ -2,22 +2,23 @@ services:
   - type: web
     name: financial-news-app
     runtime: node
-    plan: free
-    buildCommand: npm run install:all && npm run build
-    startCommand: npm start
+    buildCommand: cd client && npm install && npm run build && cd ../server && npm install
+    startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
       - key: DATABASE_URL
         fromDatabase:
           name: financial-news-db
           property: connectionString
-      - key: ALPHA_VANTAGE_API_KEY
-        sync: false
-      - key: JWT_SECRET
-        generateValue: true
+    plan: free
 
 databases:
   - name: financial-news-db
-    plan: free
-    region: virginia  # Choose your preferred region
+    databaseName: financial_news
+    user: financial_news_user
+    plan: free 
