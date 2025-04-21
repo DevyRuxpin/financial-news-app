@@ -1,20 +1,14 @@
 // Load environment variables first with error handling
 try {
-  require('dotenv').config(); // Try loading from current directory first
+  require('dotenv').config();
   console.log('Environment variables loaded');
 } catch (err) {
-  try {
-    require('dotenv').config({ path: '../.env' }); // Fallback to project root
-    console.log('Environment variables loaded from project root');
-  } catch (err) {
-    console.warn('Failed to load .env file. Using Render environment variables:', err.message);
-  }
+  console.warn('Failed to load .env file. Using Render environment variables:', err.message);
 }
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -23,7 +17,7 @@ const newsRoutes = require('./routes/newsRoutes');
 const { authMiddleware } = require('./middleware/authMiddleware');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
-const databaseService = require('./services/databaseService');
+const { pool, checkConnection, close } = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,96 +30,60 @@ requiredEnvVars.forEach(varName => {
   }
 });
 
-// Security middleware
+// Middleware
+app.use(cors());
+app.use(express.json());
 app.use(helmet());
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://financial-news-app-347q.onrender.com', 'https://jobly-backend-zp0b.onrender.com']
-    : '*',
-  credentials: true
-}));
+app.use(morgan('combined'));
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100 // limit each IP to 100 requests per windowMs
 });
-app.use('/api/', limiter);
+app.use(limiter);
 
-// Logging
-app.use(morgan('combined', { stream: logger.stream }));
-
-// Body parsing
-app.use(express.json());
-
-// API Routes
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/news', authMiddleware, newsRoutes);
 
-// Serve static files from client build
-const clientDistPath = path.join(__dirname, 'public');
-if (fs.existsSync(clientDistPath)) {
-  logger.info('Serving static files from:', clientDistPath);
-  app.use(express.static(clientDistPath));
-  
-  // Fallback for client-side routing
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientDistPath, 'index.html'));
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  const dbConnected = await checkConnection();
+  res.json({
+    status: dbConnected ? 'healthy' : 'unhealthy',
+    timestamp: new Date().toISOString(),
+    database: dbConnected ? 'connected' : 'disconnected'
   });
-} else {
-  logger.warn('Client build directory not found:', clientDistPath);
-}
+});
 
-// Error handling middleware
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+});
+
+// Error handling
 app.use(errorHandler);
-
-// Database initialization with retry logic
-async function initDB() {
-  const maxRetries = 3;
-  let retryCount = 0;
-  
-  while (retryCount < maxRetries) {
-    try {
-      await databaseService.query(`
-        CREATE TABLE IF NOT EXISTS users (
-          id SERIAL PRIMARY KEY,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          password VARCHAR(255) NOT NULL,
-          created_at TIMESTAMP DEFAULT NOW()
-        );
-        
-        CREATE TABLE IF NOT EXISTS saved_articles (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER REFERENCES users(id),
-          article_id VARCHAR(255) NOT NULL,
-          saved_at TIMESTAMP DEFAULT NOW(),
-          UNIQUE(user_id, article_id)
-        );
-      `);
-      logger.info('Database initialized successfully');
-      return;
-    } catch (err) {
-      retryCount++;
-      logger.error(`Database initialization attempt ${retryCount} failed:`, err);
-      if (retryCount < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
-    }
-  }
-  throw new Error('Database initialization failed after multiple attempts');
-}
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received. Shutting down gracefully...');
-  await databaseService.close();
+  await close();
   process.exit(0);
 });
 
 // Start server with error handling
 async function startServer() {
   try {
-    await initDB();
+    // Check database connection
+    const isConnected = await checkConnection();
+    if (!isConnected) {
+      throw new Error('Failed to connect to database');
+    }
+
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       logger.info('Current environment variables:', {
