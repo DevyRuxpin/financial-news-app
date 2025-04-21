@@ -1,6 +1,7 @@
 const axios = require('axios');
 const databaseService = require('../services/databaseService');
 const logger = require('../utils/logger');
+const newsService = require('../services/newsService');
 
 // Cache implementation
 const cache = {
@@ -100,174 +101,78 @@ const formatNewsData = (data) => ({
   items: data.items || 0
 });
 
-const getNews = async (req, res) => {
-  try {
-    const { useMock, forceRefresh } = req.query;
-    
-    // If useMock is true, return mock data immediately
-    if (useMock === 'true') {
-      console.log('Using mock data as requested');
-      return res.json(mockData);
+class NewsController {
+  async getNews(req, res) {
+    try {
+      const { tickers, topics, timeFrom } = req.query;
+      
+      const tickerArray = tickers ? tickers.split(',') : [];
+      const topicArray = topics ? topics.split(',') : [];
+      
+      const news = await newsService.getNews(tickerArray, topicArray, timeFrom);
+      
+      // Check if articles are saved for the current user
+      const articlesWithSavedStatus = await Promise.all(
+        news.feed.map(async (article) => {
+          const isSaved = await databaseService.isArticleSaved(req.user.id, article.url);
+          return { ...article, isSaved };
+        })
+      );
+      
+      res.json({ feed: articlesWithSavedStatus });
+    } catch (error) {
+      logger.error('Error in getNews controller:', error);
+      res.status(500).json({ error: 'Failed to fetch news' });
     }
+  }
 
-    // Check cache first if not forcing refresh
-    if (!forceRefresh && isCacheValid()) {
-      console.log('Returning cached data');
-      return res.json(cache.data);
-    }
+  async saveArticle(req, res) {
+    try {
+      const { articleId } = req.body;
+      const userId = req.user.id;
 
-    const { tickers, topics, time_from, sort, limit } = req.query;
-    console.log('Received request with params:', { tickers, topics, time_from, sort, limit });
-    
-    // Check if API key is available
-    if (!process.env.ALPHA_VANTAGE_API_KEY) {
-      console.error('ALPHA_VANTAGE_API_KEY is not set');
-      return res.json(mockData);
-    }
-    
-    // Default parameters for initial load
-    const defaultParams = {
-      function: 'NEWS_SENTIMENT',
-      apikey: process.env.ALPHA_VANTAGE_API_KEY,
-      limit: '5',
-      sort: 'LATEST',
-      topics: 'financial_markets'
-    };
+      // Get the full article details
+      const news = await newsService.getNews();
+      const article = news.feed.find(a => a.url === articleId);
 
-    // Build query parameters
-    const params = Object.keys(req.query).length === 0 
-      ? defaultParams 
-      : {
-          ...defaultParams,
-          ...(tickers && { tickers: tickers.toUpperCase() }),
-          ...(topics && { topics }),
-          ...(time_from && { time_from }),
-          ...(sort && { sort }),
-          ...(limit && { limit })
-        };
-    
-    console.log('Making API request with params:', { ...params, apikey: '[REDACTED]' });
-    
-    // Enhanced retry logic
-    const maxRetries = 3;
-    let retryCount = 0;
-    let lastError = null;
-    let retryDelay = 2000; // Start with 2 seconds
-
-    while (retryCount < maxRetries) {
-      try {
-        const response = await axios.get('https://www.alphavantage.co/query', { 
-          params,
-          timeout: 15000 // Increased timeout to 15 seconds
-        });
-        
-        console.log('Alpha Vantage API response:', response.data);
-        
-        if (response.data.Note) {
-          console.error('API rate limit note:', response.data.Note);
-          // Set rate limit cache
-          cache.isRateLimited = true;
-          cache.rateLimitResetTime = Date.now() + 60 * 1000; // Assume 1 minute cooldown
-          return res.json(mockData);
-        }
-
-        if (!response.data.feed) {
-          console.error('No feed data in response:', response.data);
-          return res.json(mockData);
-        }
-        
-        // Format and cache the response
-        const formattedData = formatNewsData(response.data);
-        cache.data = formattedData;
-        cache.timestamp = Date.now();
-        cache.isRateLimited = false;
-        
-        console.log('Sending formatted response with', formattedData.feed.length, 'articles');
-        return res.json(formattedData);
-      } catch (err) {
-        lastError = err;
-        retryCount++;
-        
-        // Exponential backoff
-        retryDelay *= 2;
-        
-        console.error(`Attempt ${retryCount} failed:`, {
-          message: err.message,
-          code: err.code,
-          response: err.response?.data
-        });
-        
-        if (retryCount < maxRetries) {
-          console.log(`Retrying in ${retryDelay/1000} seconds...`);
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
-        }
+      if (!article) {
+        return res.status(404).json({ error: 'Article not found' });
       }
+
+      await databaseService.saveArticle(userId, article);
+      
+      res.json({ message: 'Article saved successfully' });
+    } catch (error) {
+      logger.error('Error in saveArticle controller:', error);
+      res.status(500).json({ error: 'Failed to save article' });
     }
-
-    // If we get here, all retries failed - return mock data
-    console.error('All retries failed, returning mock data');
-    return res.json(mockData);
-  } catch (err) {
-    console.error('News fetch error:', {
-      message: err.message,
-      response: err.response?.data,
-      stack: err.stack
-    });
-    return res.json(mockData);
   }
-};
 
-const saveArticle = async (req, res) => {
-  try {
-    const { article_id } = req.body;
-    const user_id = req.user.id;
-
-    await databaseService.query(
-      'INSERT INTO saved_articles (user_id, article_id) VALUES ($1, $2) ON CONFLICT (user_id, article_id) DO NOTHING',
-      [user_id, article_id]
-    );
-
-    res.json({ message: 'Article saved successfully' });
-  } catch (error) {
-    logger.error('Error saving article:', error);
-    res.status(500).json({ error: 'Failed to save article' });
+  async getSavedArticles(req, res) {
+    try {
+      const userId = req.user.id;
+      const articles = await databaseService.getSavedArticles(userId);
+      
+      res.json({ articles });
+    } catch (error) {
+      logger.error('Error in getSavedArticles controller:', error);
+      res.status(500).json({ error: 'Failed to fetch saved articles' });
+    }
   }
-};
 
-const getSavedArticles = async (req, res) => {
-  try {
-    const user_id = req.user.id;
-    const result = await databaseService.query(
-      'SELECT article_id FROM saved_articles WHERE user_id = $1',
-      [user_id]
-    );
-    res.json(result.rows);
-  } catch (error) {
-    logger.error('Error fetching saved articles:', error);
-    res.status(500).json({ error: 'Failed to fetch saved articles' });
+  async deleteSavedArticle(req, res) {
+    try {
+      const { articleId } = req.params;
+      const userId = req.user.id;
+
+      await databaseService.deleteSavedArticle(userId, articleId);
+      
+      res.json({ message: 'Article deleted successfully' });
+    } catch (error) {
+      logger.error('Error in deleteSavedArticle controller:', error);
+      res.status(500).json({ error: 'Failed to delete article' });
+    }
   }
-};
+}
 
-const deleteSavedArticle = async (req, res) => {
-  try {
-    const { article_id } = req.params;
-    const user_id = req.user.id;
-
-    await databaseService.query(
-      'DELETE FROM saved_articles WHERE user_id = $1 AND article_id = $2',
-      [user_id, article_id]
-    );
-
-    res.json({ message: 'Article deleted successfully' });
-  } catch (error) {
-    logger.error('Error deleting article:', error);
-    res.status(500).json({ error: 'Failed to delete article' });
-  }
-};
-
-module.exports = {
-  getNews,
-  saveArticle,
-  getSavedArticles,
-  deleteSavedArticle
-};
+module.exports = new NewsController();

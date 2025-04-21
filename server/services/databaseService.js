@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const logger = require('../utils/logger');
+const { pool } = require('../config/database');
 
 class DatabaseService {
   constructor() {
@@ -101,6 +102,94 @@ class DatabaseService {
     } catch (error) {
       logger.error('Database connection check failed:', error);
       return false;
+    }
+  }
+
+  async saveArticle(userId, article) {
+    try {
+      const query = `
+        INSERT INTO saved_articles (
+          user_id, 
+          article_url, 
+          article_title, 
+          article_summary, 
+          article_sentiment, 
+          article_tickers
+        ) 
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (user_id, article_url) DO NOTHING
+        RETURNING id
+      `;
+
+      const values = [
+        userId,
+        article.url,
+        article.title,
+        article.summary,
+        article.sentiment,
+        article.tickers
+      ];
+
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Error saving article:', error);
+      throw error;
+    }
+  }
+
+  async getSavedArticles(userId) {
+    try {
+      const query = `
+        SELECT 
+          id,
+          article_url as url,
+          article_title as title,
+          article_summary as summary,
+          article_sentiment as sentiment,
+          article_tickers as tickers,
+          saved_at
+        FROM saved_articles
+        WHERE user_id = $1
+        ORDER BY saved_at DESC
+      `;
+
+      const result = await pool.query(query, [userId]);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error fetching saved articles:', error);
+      throw error;
+    }
+  }
+
+  async deleteSavedArticle(userId, articleUrl) {
+    try {
+      const query = `
+        DELETE FROM saved_articles
+        WHERE user_id = $1 AND article_url = $2
+        RETURNING id
+      `;
+
+      const result = await pool.query(query, [userId, articleUrl]);
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Error deleting saved article:', error);
+      throw error;
+    }
+  }
+
+  async isArticleSaved(userId, articleUrl) {
+    try {
+      const query = `
+        SELECT id FROM saved_articles
+        WHERE user_id = $1 AND article_url = $2
+      `;
+
+      const result = await pool.query(query, [userId, articleUrl]);
+      return result.rows.length > 0;
+    } catch (error) {
+      logger.error('Error checking if article is saved:', error);
+      throw error;
     }
   }
 }
