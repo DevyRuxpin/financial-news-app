@@ -12,7 +12,9 @@
     "test:schema": "node scripts/setup-test-schema.js",
     "test:all": "npm run test:setup && npm run test:schema && npm test",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "build:client": "cd client && npm install && npm run build",
+    "install:all": "npm install && cd client && npm install"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -38,6 +40,11 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "jest": "^29.7.0",
     "nodemon": "^2.0.22",
-    "supertest": "^6.3.4"
+    "supertest": "^6.3.4",
+    "vite": "^4.4.9",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.3"
   }
 }
