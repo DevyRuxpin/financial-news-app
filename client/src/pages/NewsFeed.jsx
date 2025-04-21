@@ -1,143 +1,84 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import NewsCard from '../components/NewsCard';
 import NewsFilter from '../components/NewsFilter';
-import { AuthContext } from '../context/AuthContext';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { toast } from 'react-toastify';
 
 const NewsFeed = () => {
-  const [articles, setArticles] = useState([]);
+  const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [usingMockData, setUsingMockData] = useState(false);
   const [filters, setFilters] = useState({
-    tickers: '',
-    topics: '',
-    time_from: '',
-    sort: 'LATEST'
+    tickers: [],
+    topics: [],
+    timeFrom: null
   });
-  const { user } = useContext(AuthContext);
+  const { token } = useAuth();
 
-  const fetchNews = async (searchParams = {}, useMock = false) => {
+  useEffect(() => {
+    fetchNews();
+  }, [filters]);
+
+  const fetchNews = async () => {
     try {
       setLoading(true);
-      setError(null);
-      console.log('Fetching news with params:', searchParams);
-      
-      const response = await axios.get('/api/news', { 
-        params: {
-          ...searchParams,
-          useMock: useMock ? 'true' : 'false'
-        },
-        timeout: 15000
+      const params = new URLSearchParams();
+      if (filters.tickers.length) params.append('tickers', filters.tickers.join(','));
+      if (filters.topics.length) params.append('topics', filters.topics.join(','));
+      if (filters.timeFrom) params.append('timeFrom', filters.timeFrom);
+
+      const response = await axios.get(`/api/news?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       
-      console.log('News API response:', response.data);
-      
-      if (!response.data.feed || response.data.feed.length === 0) {
-        setArticles([]);
-        setError('No articles found. Try adjusting your filters.');
-        return;
-      }
-      
-      setArticles(response.data.feed);
-      setUsingMockData(useMock);
-    } catch (err) {
-      console.error('Error fetching news:', err.response || err);
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch news articles. Please try again later.';
-      setError(errorMessage);
-      setArticles([]);
+      setNews(response.data.feed);
+    } catch (error) {
+      toast.error('Failed to fetch news');
+      console.error('Error fetching news:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = () => {
-    fetchNews(filters);
-  };
-
-  const toggleMockData = () => {
-    fetchNews(filters, !usingMockData);
-  };
-
-  const handleSave = async (articleUrl) => {
-    if (!user) {
-      alert('Please login to save articles');
-      return;
-    }
+  const handleSaveArticle = async (articleId) => {
     try {
-      await axios.post('/api/news/save', {
-        user_id: user.id,
-        article_id: articleUrl
+      await axios.post('/api/news/save', { articleId }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      alert('Article saved successfully!');
-    } catch (err) {
-      console.error('Failed to save article:', err);
-      alert('Failed to save article. Please try again.');
+      toast.success('Article saved successfully');
+    } catch (error) {
+      toast.error('Failed to save article');
+      console.error('Error saving article:', error);
     }
   };
-
-  // Fetch initial articles on component mount
-  useEffect(() => {
-    fetchNews(filters, true); // Start with mock data
-  }, []);
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Financial News</h1>
-        <button
-          onClick={toggleMockData}
-          className={`px-4 py-2 rounded transition-colors ${
-            usingMockData 
-              ? 'bg-green-600 hover:bg-green-700 text-white' 
-              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-          }`}
-        >
-          {usingMockData ? 'Switch to Real Data' : 'Use Mock Data'}
-        </button>
-      </div>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-900">Financial News</h1>
       
-      {usingMockData && (
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-6">
-          <p>Note: Using mock data due to API rate limits. Real-time data will be available when the rate limit resets.</p>
+      <NewsFilter 
+        filters={filters}
+        setFilters={setFilters}
+      />
+      
+      {loading ? (
+        <LoadingSpinner />
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {news.map((article) => (
+            <NewsCard
+              key={article.url}
+              article={article}
+              onSave={() => handleSaveArticle(article.url)}
+            />
+          ))}
         </div>
       )}
       
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <NewsFilter filters={filters} setFilters={setFilters} />
-        
-        <div className="flex justify-end mt-4">
-          <button
-            onClick={handleSearch}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-            disabled={loading}
-          >
-            {loading ? 'Loading...' : 'Search'}
-          </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-        </div>
-      ) : error ? (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      ) : articles.length === 0 ? (
-        <div className="text-center py-12 text-gray-600 bg-white rounded-xl shadow-sm">
-          No articles found. Try adjusting your filters.
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {articles.map((article, index) => (
-            <NewsCard
-              key={index}
-              article={article}
-              onSave={handleSave}
-            />
-          ))}
+      {!loading && news.length === 0 && (
+        <div className="text-center text-gray-500">
+          No news articles found matching your filters.
         </div>
       )}
     </div>

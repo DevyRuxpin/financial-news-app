@@ -1,70 +1,145 @@
+import { useState } from 'react';
+
 const NewsFilter = ({ filters, setFilters }) => {
-    const topics = [
-      { value: 'blockchain', label: 'Blockchain' },
-      { value: 'earnings', label: 'Earnings' },
-      { value: 'ipo', label: 'IPO' },
-      { value: 'mergers_and_acquisitions', label: 'M&A' },
-      { value: 'financial_markets', label: 'Financial Markets' },
-      { value: 'economy_fiscal', label: 'Fiscal Policy' },
-      { value: 'economy_monetary', label: 'Monetary Policy' },
-      { value: 'technology', label: 'Technology' }
-    ];
-  
-    return (
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <h2 className="text-lg font-semibold mb-4">Filter News</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tickers (e.g., AAPL,MSFT)</label>
-            <input
-              type="text"
-              value={filters.tickers}
-              onChange={(e) => setFilters({...filters, tickers: e.target.value})}
-              className="w-full p-2 border rounded"
-              placeholder="AAPL,MSFT"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Topics</label>
-            <select
-              value={filters.topics}
-              onChange={(e) => setFilters({...filters, topics: e.target.value})}
-              className="w-full p-2 border rounded"
+  const [tickerInput, setTickerInput] = useState('');
+  const [topicInput, setTopicInput] = useState('');
+
+  const handleTickerChange = (e) => {
+    setTickerInput(e.target.value.toUpperCase());
+  };
+
+  const handleTopicChange = (e) => {
+    setTopicInput(e.target.value);
+  };
+
+  const addTicker = () => {
+    if (tickerInput && !filters.tickers.includes(tickerInput)) {
+      setFilters({
+        ...filters,
+        tickers: [...filters.tickers, tickerInput]
+      });
+      setTickerInput('');
+    }
+  };
+
+  const addTopic = () => {
+    if (topicInput && !filters.topics.includes(topicInput)) {
+      setFilters({
+        ...filters,
+        topics: [...filters.topics, topicInput]
+      });
+      setTopicInput('');
+    }
+  };
+
+  const removeTicker = (ticker) => {
+    setFilters({
+      ...filters,
+      tickers: filters.tickers.filter(t => t !== ticker)
+    });
+  };
+
+  const removeTopic = (topic) => {
+    setFilters({
+      ...filters,
+      topics: filters.topics.filter(t => t !== topic)
+    });
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-md p-4 space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Stock Tickers
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={tickerInput}
+            onChange={handleTickerChange}
+            placeholder="e.g., AAPL, MSFT"
+            className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          />
+          <button
+            onClick={addTicker}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Add
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {filters.tickers.map((ticker) => (
+            <span
+              key={ticker}
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
             >
-              <option value="">All Topics</option>
-              {topics.map((topic) => (
-                <option key={topic.value} value={topic.value}>{topic.label}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date From</label>
-            <input
-              type="date"
-              value={filters.time_from}
-              onChange={(e) => setFilters({...filters, time_from: e.target.value})}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
-            <select
-              value={filters.sort}
-              onChange={(e) => setFilters({...filters, sort: e.target.value})}
-              className="w-full p-2 border rounded"
-            >
-              <option value="LATEST">Latest</option>
-              <option value="EARLIEST">Earliest</option>
-              <option value="RELEVANCE">Relevance</option>
-            </select>
-          </div>
+              {ticker}
+              <button
+                onClick={() => removeTicker(ticker)}
+                className="ml-1 text-blue-600 hover:text-blue-800"
+              >
+                ×
+              </button>
+            </span>
+          ))}
         </div>
       </div>
-    );
-  };
-  
-  export default NewsFilter;
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Topics
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={topicInput}
+            onChange={handleTopicChange}
+            placeholder="e.g., technology, finance"
+            className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          />
+          <button
+            onClick={addTopic}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Add
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {filters.topics.map((topic) => (
+            <span
+              key={topic}
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+            >
+              {topic}
+              <button
+                onClick={() => removeTopic(topic)}
+                className="ml-1 text-green-600 hover:text-green-800"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Time Period
+        </label>
+        <select
+          value={filters.timeFrom || ''}
+          onChange={(e) => setFilters({ ...filters, timeFrom: e.target.value || null })}
+          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+        >
+          <option value="">All Time</option>
+          <option value="20240401">Last Month</option>
+          <option value="20240301">Last 2 Months</option>
+          <option value="20240101">Last 4 Months</option>
+        </select>
+      </div>
+    </div>
+  );
+};
+
+export default NewsFilter;
   

@@ -1,76 +1,85 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import NewsCard from '../components/NewsCard';
-import { AuthContext } from '../context/AuthContext';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { toast } from 'react-hot-toast';
 
 const SavedArticles = () => {
-  const [savedArticles, setSavedArticles] = useState([]);
+  const { user } = useAuth();
+  const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { user } = useContext(AuthContext);
 
   useEffect(() => {
-    const fetchSavedArticles = async () => {
-      if (!user) return;
-      
-      try {
-        setLoading(true);
-        const response = await axios.get(`/api/news/saved/${user.id}`);
-        setSavedArticles(response.data);
-      } catch (err) {
-        setError('Failed to fetch saved articles');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchSavedArticles();
-  }, [user]);
+  }, []);
 
-  const handleRemove = async (articleId) => {
+  const fetchSavedArticles = async () => {
     try {
-      await axios.delete(`/api/news/saved/${articleId}`);
-      setSavedArticles(savedArticles.filter(article => article.article_id !== articleId));
+      setLoading(true);
+      const response = await axios.get('/api/news/saved', {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      setArticles(response.data.articles);
+      setError(null);
     } catch (err) {
-      console.error('Failed to remove article:', err);
+      setError('Failed to fetch saved articles');
+      toast.error('Failed to load saved articles');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleDelete = async (articleUrl) => {
+    try {
+      await axios.delete(`/api/news/saved/${encodeURIComponent(articleUrl)}`, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      setArticles(articles.filter(article => article.url !== articleUrl));
+      toast.success('Article removed from saved articles');
+    } catch (err) {
+      toast.error('Failed to remove article');
+    }
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-red-600">{error}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Saved Articles</h1>
-      
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Saved Articles</h1>
+          <p className="mt-2 text-gray-600">
+            {articles.length === 0 
+              ? "You haven't saved any articles yet."
+              : `You have ${articles.length} saved article${articles.length === 1 ? '' : 's'}.`}
+          </p>
         </div>
-      ) : error ? (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      ) : savedArticles.length === 0 ? (
-        <p>You haven't saved any articles yet.</p>
-      ) : (
-        <div className="mt-6">
-          {savedArticles.map((savedArticle) => (
-            <div key={savedArticle.id} className="relative">
-              <NewsCard 
-                article={savedArticle} 
-                onSave={() => {}} 
-              />
-              <button
-                onClick={() => handleRemove(savedArticle.article_id)}
-                className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {articles.map((article) => (
+            <NewsCard
+              key={article.url}
+              article={article}
+              onDelete={() => handleDelete(article.url)}
+              isSaved={true}
+            />
           ))}
         </div>
-      )}
+      </div>
     </div>
   );
 };
