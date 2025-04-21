@@ -36,7 +36,7 @@ class UserModel {
       await this.validatePassword(password);
 
       const { rows } = await databaseService.query(
-        'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email',
+        'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email',
         [email, password]
       );
       return rows[0];
@@ -78,7 +78,7 @@ class UserModel {
       }
       if (updates.password) {
         await this.validatePassword(updates.password);
-        validUpdates.password = updates.password;
+        validUpdates.password_hash = updates.password;
       }
 
       const setClause = Object.keys(validUpdates)
