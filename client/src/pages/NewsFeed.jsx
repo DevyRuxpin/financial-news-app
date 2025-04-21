@@ -4,7 +4,7 @@ import axios from 'axios';
 import NewsCard from '../components/NewsCard';
 import NewsFilter from '../components/NewsFilter';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { toast } from 'react-toastify';
+import { toast } from 'react-hot-toast';
 
 const NewsFeed = () => {
   const [news, setNews] = useState([]);
