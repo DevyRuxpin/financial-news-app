@@ -2,7 +2,7 @@ services:
   - type: web
     name: financial-news-app
     runtime: node
-    buildCommand: cd client && npm install --force && npm install tailwindcss@latest postcss@latest autoprefixer@latest && npm run build --mode production && cd ../server && npm install
+    buildCommand: cd client && npm install --force && npm install tailwindcss@latest postcss@latest autoprefixer@latest && VITE_API_URL=https://financial-news-app.onrender.com npm run build
     startCommand: cd server && npm start
     envVars:
       - key: DATABASE_URL
